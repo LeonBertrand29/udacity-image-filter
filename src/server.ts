@@ -1,15 +1,19 @@
-import express from 'express';
+//import express from 'express';
 import bodyParser from 'body-parser';
-import {filterImageFromURL, deleteLocalFiles} from './util/util';
+import { filterImageFromURL, deleteLocalFiles } from './util/util';
+import express, { Express, Request, Response } from 'express';
+
+
 
 (async () => {
 
   // Init the Express application
-  const app = express();
+  const app: Express = express();
+
 
   // Set the network port
   const port = process.env.PORT || 8082;
-  
+
   // Use the body parser middleware for post requests
   app.use(bodyParser.json());
 
@@ -28,19 +32,52 @@ import {filterImageFromURL, deleteLocalFiles} from './util/util';
   //   the filtered image file [!!TIP res.sendFile(filteredpath); might be useful]
 
   /**************************************************************************** */
+  app.get("/filteredimage/", async (req: Request, res: Response) => {
+    // destruct our query paramaters
+    const imageUrl: string = req.query.image_url;
+    //res.send(imageUrl)
+    if (!imageUrl) {
+      res
+        .status(422)
+        .send({ message: 'image_url query parameter is required' });
+      return
+    }
+    try {
+      const filteredpath = await filterImageFromURL(imageUrl);
 
-  //! END @TODO1
-  
+      res.sendFile(filteredpath);
+      res.on("finish", function () {
+        deleteLocalFiles([filteredpath]);
+      });
+
+
+      //deleteLocalFiles([filteredpath]);
+    } catch (error) {
+      const errorMessage = error.toString();
+      let errorCode = 500;
+
+      if (error.toString().includes('Unsupported MIME type')) {
+        errorCode = 422;
+      }
+
+      return res
+        .status(errorCode)
+        .send({ message: errorMessage });
+    }
+
+
+
+
+  });
   // Root Endpoint
   // Displays a simple message to the user
-  app.get( "/", async ( req, res ) => {
+  app.get("/", async (req, res) => {
     res.send("try GET /filteredimage?image_url={{}}")
-  } );
-  
+  });
 
   // Start the Server
-  app.listen( port, () => {
-      console.log( `server running http://localhost:${ port }` );
-      console.log( `press CTRL+C to stop server` );
-  } );
+  app.listen(port, () => {
+    console.log(`server running http://localhost:${port}`);
+    console.log(`press CTRL+C to stop server`);
+  });
 })();
